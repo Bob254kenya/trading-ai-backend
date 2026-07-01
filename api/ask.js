@@ -1,12 +1,13 @@
- /**
- * Serverless backend for the AI assistant widget — Vercel version.
- * No server to run or maintain; Vercel hosts this function for you.
+/**
+ * Serverless backend for the AI assistant widget — Gemini (free tier) version.
+ * Uses Google's Gemini API instead of Anthropic's, since Gemini offers a
+ * genuinely free tier with no credit card required.
  *
- * This file lives at: api/ask.js
- * Once deployed, it becomes available at: https://your-project.vercel.app/api/ask
+ * This file lives at: api/ask.js — replace your existing one with this.
+ * Once deployed, it's available at: https://your-project.vercel.app/api/ask
  */
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "gemini-2.5-flash"; // fast, and covered by the free tier
 
 const SYSTEM_PROMPT = `
 You are a friendly, patient assistant embedded in a trading platform, built to help
@@ -37,7 +38,6 @@ Warm, clear, never condescending. Assume the user is smart but new to trading.
 `.trim();
 
 export default async function handler(req, res) {
-  // Only allow your own site to call this (edit the domain before going live)
   res.setHeader("Access-Control-Allow-Origin", "*"); // tighten this to your domain in production
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -59,33 +59,39 @@ export default async function handler(req, res) {
 
     const trimmedHistory = history.slice(-10);
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 400,
-        system: SYSTEM_PROMPT,
-        messages: trimmedHistory,
-      }),
-    });
+    // Gemini uses "user"/"model" roles and a different message shape than Anthropic
+    const geminiContents = trimmedHistory.map((msg) => ({
+      role: msg.role === "assistant" ? "model" : "user",
+      parts: [{ text: msg.content }],
+    }));
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: geminiContents,
+          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          generationConfig: { maxOutputTokens: 400 },
+        }),
+      }
+    );
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("Anthropic API error:", errText);
+      console.error("Gemini API error:", errText);
       return res.status(502).json({ error: "AI service error" });
     }
 
     const data = await response.json();
-    const answer = data.content?.find((c) => c.type === "text")?.text || "";
+    const answer =
+      data.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "Sorry, I couldn't generate a response.";
 
     return res.status(200).json({ answer });
   } catch (err) {
     console.error("Server error:", err);
     return res.status(500).json({ error: "Internal server error" });
   }
-}
+                                        }
