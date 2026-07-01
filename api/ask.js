@@ -1,4 +1,4 @@
-/**
+ /**
  * Serverless backend for the AI assistant widget — Vercel version.
  * No server to run or maintain; Vercel hosts this function for you.
  *
