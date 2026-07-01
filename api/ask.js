@@ -37,8 +37,16 @@ TONE:
 Warm, clear, never condescending. Assume the user is smart but new to trading.
 `.trim();
 
+const ALLOWED_ORIGINS = [
+  "https://ramzfx.site",
+  "https://www.ramzfx.site",
+];
+
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*"); // tighten this to your domain in production
+  const origin = req.headers.origin;
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
@@ -94,4 +102,4 @@ export default async function handler(req, res) {
     console.error("Server error:", err);
     return res.status(500).json({ error: "Internal server error" });
   }
-                                        }
+        }
